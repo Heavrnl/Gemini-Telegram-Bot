@@ -1,0 +1,7 @@
+version: '3'
+services:
+  gemini-telegram-bot:
+    build: .
+    volumes:
+      - ./config.py:/app/config.py
+    restart: unless-stopped

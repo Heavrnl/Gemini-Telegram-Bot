@@ -5,17 +5,19 @@ import google.generativeai as genai
 import re
 import telebot
 from telebot.async_telebot import AsyncTeleBot
-from telebot.types import  Message
+from telebot.types import Message
+
+import config
 
 gemini_player_dict = {}
 gemini_pro_player_dict = {}
 default_model_dict = {}
 
-error_info="⚠️⚠️⚠️\nSomething went wrong !\nplease try to change your prompt or contact the admin !"
-before_generate_info="🤖Generating🤖"
-download_pic_notify="🤖Loading picture🤖"
+error_info = "⚠️⚠️⚠️\nSomething went wrong !\nplease try to change your prompt or contact the admin !"
+before_generate_info = "🤖Generating🤖"
+download_pic_notify = "🤖Loading picture🤖"
 
-n = 30  #Number of historical records to keep
+n = 30  # Number of historical records to keep
 
 generation_config = {
     "temperature": 1,
@@ -29,9 +31,9 @@ safety_settings = [
         "category": "HARM_CATEGORY_HARASSMENT",
         "threshold": "BLOCK_NONE"
     },
-    {   "category": "HARM_CATEGORY_HATE_SPEECH",
-        "threshold": "BLOCK_NONE"
-    },
+    {"category": "HARM_CATEGORY_HATE_SPEECH",
+     "threshold": "BLOCK_NONE"
+     },
     {
         "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
         "threshold": "BLOCK_NONE"
@@ -42,6 +44,8 @@ safety_settings = [
     },
 ]
 
+def is_user_allowed(user_id):
+    return user_id in config.ALLOWED_USERS
 def find_all_index(str, pattern):
     index_list = [0]
     for match in re.finditer(pattern, str, re.MULTILINE):
@@ -52,16 +56,17 @@ def find_all_index(str, pattern):
     index_list.append(len(str))
     return index_list
 
+
 def replace_all(text, pattern, function):
     poslist = [0]
     strlist = []
     originstr = []
     poslist = find_all_index(text, pattern)
     for i in range(1, len(poslist[:-1]), 2):
-        start, end = poslist[i : i + 2]
+        start, end = poslist[i: i + 2]
         strlist.append(function(text[start:end]))
     for i in range(0, len(poslist), 2):
-        j, k = poslist[i : i + 2]
+        j, k = poslist[i: i + 2]
         originstr.append(text[j:k])
     if len(strlist) < len(originstr):
         strlist.append("")
@@ -70,17 +75,22 @@ def replace_all(text, pattern, function):
     new_list = [item for pair in zip(originstr, strlist) for item in pair]
     return "".join(new_list)
 
+
 def escapeshape(text):
     return "▎*" + text.split()[1] + "*"
+
 
 def escapeminus(text):
     return "\\" + text
 
+
 def escapebackquote(text):
     return r"\`\`"
 
+
 def escapeplus(text):
     return "\\" + text
+
 
 def escape(text, flag=0):
     # In all other places characters
@@ -133,6 +143,7 @@ def escape(text, flag=0):
     text = re.sub(r"!", "\!", text)
     return text
 
+
 # Prevent "create_convo" function from blocking the event loop.
 async def make_new_gemini_convo():
     loop = asyncio.get_running_loop()
@@ -150,6 +161,7 @@ async def make_new_gemini_convo():
     convo = await loop.run_in_executor(None, create_convo)
     return convo
 
+
 async def make_new_gemini_pro_convo():
     loop = asyncio.get_running_loop()
 
@@ -166,11 +178,13 @@ async def make_new_gemini_pro_convo():
     convo = await loop.run_in_executor(None, create_convo)
     return convo
 
+
 # Prevent "send_message" function from blocking the event loop.
 async def send_message(player, message):
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, player.send_message, message)
-    
+
+
 # Prevent "model.generate_content" function from blocking the event loop.
 async def async_generate_content(model, contents):
     loop = asyncio.get_running_loop()
@@ -181,7 +195,8 @@ async def async_generate_content(model, contents):
     response = await loop.run_in_executor(None, generate)
     return response
 
-async def gemini(bot,message,m):
+
+async def gemini(bot, message, m):
     player = None
     if str(message.from_user.id) not in gemini_player_dict:
         player = await make_new_gemini_convo()
@@ -194,15 +209,18 @@ async def gemini(bot,message,m):
         sent_message = await bot.reply_to(message, before_generate_info)
         await send_message(player, m)
         try:
-            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id, message_id=sent_message.message_id, parse_mode="MarkdownV2")
+            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id,
+                                        message_id=sent_message.message_id, parse_mode="MarkdownV2")
         except:
-            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id,
+                                        message_id=sent_message.message_id)
 
     except Exception:
         traceback.print_exc()
         await bot.edit_message_text(error_info, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
 
-async def gemini_pro(bot,message,m):
+
+async def gemini_pro(bot, message, m):
     player = None
     if str(message.from_user.id) not in gemini_pro_player_dict:
         player = await make_new_gemini_pro_convo()
@@ -215,26 +233,29 @@ async def gemini_pro(bot,message,m):
         sent_message = await bot.reply_to(message, before_generate_info)
         await send_message(player, m)
         try:
-            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id, message_id=sent_message.message_id, parse_mode="MarkdownV2")
+            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id,
+                                        message_id=sent_message.message_id, parse_mode="MarkdownV2")
         except:
-            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+            await bot.edit_message_text(escape(player.last.text), chat_id=sent_message.chat.id,
+                                        message_id=sent_message.message_id)
 
     except Exception:
         traceback.print_exc()
         await bot.edit_message_text(error_info, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
 
+
 async def main():
     # Init args
-    parser = argparse.ArgumentParser()
-    parser.add_argument("tg_token", help="telegram token")
-    parser.add_argument("GOOGLE_GEMINI_KEY", help="Google Gemini API key")
-    options = parser.parse_args()
-    print("Arg parse done.")
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("tg_token", help="telegram token")
+    # parser.add_argument("GOOGLE_GEMINI_KEY", help="Google Gemini API key")
+    # options = parser.parse_args()
+    # print("Arg parse done.")
 
-    genai.configure(api_key=options.GOOGLE_GEMINI_KEY)
+    genai.configure(api_key=config.GEMINI_API_KEY)
 
     # Init bot
-    bot = AsyncTeleBot(options.tg_token)
+    bot = AsyncTeleBot(config.TELEGRAM_BOT_API_KEY)
     await bot.delete_my_commands(scope=None, language_code=None)
     await bot.set_my_commands(
         commands=[
@@ -242,7 +263,7 @@ async def main():
             telebot.types.BotCommand("gemini", "using gemini-1.5-flash"),
             telebot.types.BotCommand("gemini_pro", "using gemini-1.5-pro"),
             telebot.types.BotCommand("clear", "Clear all history"),
-            telebot.types.BotCommand("switch","switch default model")
+            telebot.types.BotCommand("switch", "switch default model")
         ],
     )
     print("Bot init done.")
@@ -251,30 +272,48 @@ async def main():
     @bot.message_handler(commands=["start"])
     async def gemini_handler(message: Message):
         try:
-            await bot.reply_to( message , escape("Welcome, you can ask me questions now. \nFor example: `Who is john lennon?`"), parse_mode="MarkdownV2")
+            if not is_user_allowed(message.from_user.id):
+                await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+                return
+            await bot.reply_to(message,
+                               escape("Welcome, you can ask me questions now. \nFor example: `Who is john lennon?`"),
+                               parse_mode="MarkdownV2")
         except IndexError:
             await bot.reply_to(message, error_info)
 
     @bot.message_handler(commands=["gemini"])
     async def gemini_handler(message: Message):
         try:
+            if not is_user_allowed(message.from_user.id):
+                await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+                return
             m = message.text.strip().split(maxsplit=1)[1].strip()
         except IndexError:
-            await bot.reply_to( message , escape("Please add what you want to say after /gemini. \nFor example: `/gemini Who is john lennon?`"), parse_mode="MarkdownV2")
+            await bot.reply_to(message, escape(
+                "Please add what you want to say after /gemini. \nFor example: `/gemini Who is john lennon?`"),
+                               parse_mode="MarkdownV2")
             return
-        await gemini(bot,message,m)
+        await gemini(bot, message, m)
 
     @bot.message_handler(commands=["gemini_pro"])
     async def gemini_handler(message: Message):
         try:
+            if not is_user_allowed(message.from_user.id):
+                await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+                return
             m = message.text.strip().split(maxsplit=1)[1].strip()
         except IndexError:
-            await bot.reply_to( message , escape("Please add what you want to say after /gemini_pro. \nFor example: `/gemini_pro Who is john lennon?`"), parse_mode="MarkdownV2")
+            await bot.reply_to(message, escape(
+                "Please add what you want to say after /gemini_pro. \nFor example: `/gemini_pro Who is john lennon?`"),
+                               parse_mode="MarkdownV2")
             return
-        await gemini_pro(bot,message,m)
-            
+        await gemini_pro(bot, message, m)
+
     @bot.message_handler(commands=["clear"])
     async def gemini_handler(message: Message):
+        if not is_user_allowed(message.from_user.id):
+            await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+            return
         # Check if the player is already in gemini_player_dict.
         if (str(message.from_user.id) in gemini_player_dict):
             del gemini_player_dict[str(message.from_user.id)]
@@ -284,39 +323,45 @@ async def main():
 
     @bot.message_handler(commands=["switch"])
     async def gemini_handler(message: Message):
+        if not is_user_allowed(message.from_user.id):
+            await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+            return
         if message.chat.type != "private":
-            await bot.reply_to( message , "This command is only for private chat !")
+            await bot.reply_to(message, "This command is only for private chat !")
             return
         # Check if the player is already in default_model_dict.
         if str(message.from_user.id) not in default_model_dict:
             default_model_dict[str(message.from_user.id)] = False
-            await bot.reply_to( message , "Now you are using gemini-1.5-pro")
+            await bot.reply_to(message, "Now you are using gemini-1.5-pro")
             return
         if default_model_dict[str(message.from_user.id)] == True:
             default_model_dict[str(message.from_user.id)] = False
-            await bot.reply_to( message , "Now you are using gemini-1.5-pro")
+            await bot.reply_to(message, "Now you are using gemini-1.5-pro")
         else:
             default_model_dict[str(message.from_user.id)] = True
-            await bot.reply_to( message , "Now you are using gemini-1.5-flash")
-        
-    
-    
+            await bot.reply_to(message, "Now you are using gemini-1.5-flash")
+
     @bot.message_handler(func=lambda message: message.chat.type == "private", content_types=['text'])
     async def gemini_private_handler(message: Message):
+        if not is_user_allowed(message.from_user.id):
+            await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+            return
         m = message.text.strip()
 
         if str(message.from_user.id) not in default_model_dict:
             default_model_dict[str(message.from_user.id)] = True
-            await gemini(bot,message,m)
+            await gemini(bot, message, m)
         else:
             if default_model_dict[str(message.from_user.id)]:
-                await gemini(bot,message,m)
+                await gemini(bot, message, m)
             else:
-                await gemini_pro(bot,message,m)
-
+                await gemini_pro(bot, message, m)
 
     @bot.message_handler(content_types=["photo"])
     async def gemini_photo_handler(message: Message) -> None:
+        if not is_user_allowed(message.from_user.id):
+            await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
+            return
         if message.chat.type != "private":
             s = message.caption
             if not s or not (s.startswith("/gemini")):
@@ -334,12 +379,15 @@ async def main():
                 "parts": [{"mime_type": "image/jpeg", "data": downloaded_file}, {"text": prompt}]
             }
             try:
-                await bot.edit_message_text(before_generate_info, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+                await bot.edit_message_text(before_generate_info, chat_id=sent_message.chat.id,
+                                            message_id=sent_message.message_id)
                 response = await async_generate_content(model, contents)
-                await bot.edit_message_text(response.text, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+                await bot.edit_message_text(response.text, chat_id=sent_message.chat.id,
+                                            message_id=sent_message.message_id)
             except Exception:
                 traceback.print_exc()
-                await bot.edit_message_text(error_info, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+                await bot.edit_message_text(error_info, chat_id=sent_message.chat.id,
+                                            message_id=sent_message.message_id)
         else:
             s = message.caption if message.caption else ""
             try:
@@ -355,16 +403,20 @@ async def main():
                 "parts": [{"mime_type": "image/jpeg", "data": downloaded_file}, {"text": prompt}]
             }
             try:
-                await bot.edit_message_text(before_generate_info, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+                await bot.edit_message_text(before_generate_info, chat_id=sent_message.chat.id,
+                                            message_id=sent_message.message_id)
                 response = await async_generate_content(model, contents)
-                await bot.edit_message_text(response.text, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+                await bot.edit_message_text(response.text, chat_id=sent_message.chat.id,
+                                            message_id=sent_message.message_id)
             except Exception:
                 traceback.print_exc()
-                await bot.edit_message_text(error_info, chat_id=sent_message.chat.id, message_id=sent_message.message_id)
+                await bot.edit_message_text(error_info, chat_id=sent_message.chat.id,
+                                            message_id=sent_message.message_id)
 
     # Start bot
     print("Starting Gemini_Telegram_Bot.")
     await bot.polling(none_stop=True)
+
 
 if __name__ == '__main__':
     asyncio.run(main())
