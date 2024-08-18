@@ -257,6 +257,7 @@ async def main():
     # Init bot
     bot = AsyncTeleBot(config.TELEGRAM_BOT_API_KEY)
     await bot.delete_my_commands(scope=None, language_code=None)
+
     await bot.set_my_commands(
         commands=[
             telebot.types.BotCommand("start", "Start"),
@@ -359,6 +360,7 @@ async def main():
 
     @bot.message_handler(content_types=["photo"])
     async def gemini_photo_handler(message: Message) -> None:
+        print("photo")
         if not is_user_allowed(message.from_user.id):
             await bot.reply_to(message, "Sorry, you are not authorized to use this bot.")
             return
@@ -398,7 +400,13 @@ async def main():
             except Exception:
                 traceback.print_exc()
                 await bot.reply_to(message, error_info)
-            model = genai.GenerativeModel("gemini-pro-vision")
+            if str(message.from_user.id) not in default_model_dict:
+                default_model_dict[str(message.from_user.id)] = True
+            else:
+                if default_model_dict[str(message.from_user.id)]:
+                    model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                else:
+                    model = genai.GenerativeModel("gemini-1.5-pro-latest")
             contents = {
                 "parts": [{"mime_type": "image/jpeg", "data": downloaded_file}, {"text": prompt}]
             }
